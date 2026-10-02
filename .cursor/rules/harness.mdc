@@ -1,0 +1,6 @@
+---
+description: Shared development harness and ownership contract
+alwaysApply: true
+---
+
+Read `AGENTS.md` as the shared contract and `docs/project.md` for project facts. Use `.agents/skills/start-work/SKILL.md` when starting changes and `.agents/skills/finish-work/SKILL.md` when finishing. Read-only advice does not start writer work. Do not duplicate or override the common instructions here.

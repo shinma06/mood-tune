@@ -36,8 +36,9 @@
 
 ## 必要環境
 
-- Node.js 20 以上推奨
+- Node.js 22（CI と `.node-version` に合わせる）
 - npm
+- Python 3.11 以上（開発ハーネス）
 
 ---
 
@@ -46,9 +47,9 @@
 ### 1. インストール
 
 ```bash
-git clone https://github.com/shinma06/MoodTune.git
-cd MoodTune
-npm install
+git clone https://github.com/shinma06/mood-tune.git
+cd mood-tune
+npm ci
 ```
 
 ### 2. 環境変数
@@ -60,7 +61,6 @@ npm install
 | `OPENAI_API_KEY`              | Spotifyログイン時  | ログイン済みユーザー向けのプレイリスト生成（非ログイン時は固定データ） |
 | `AUTH_SECRET`                 | Spotify ログイン時 | セッション暗号化キー（32 文字以上推奨）                                |
 | `AUTH_SPOTIFY_ID`             | Spotify ログイン時 | Spotify Client ID                                                      |
-| `AUTH_SPOTIFY_SECRET`         | Spotify ログイン時 | Spotify Client Secret                                                  |
 | `AUTH_URL` / `NEXTAUTH_URL`   | Spotify ログイン時 | 例: `http://127.0.0.1:3000`                                            |
 | `WXTECH_API_KEY`              | 推奨               | WxTech API キー                                                        |
 | `NEXT_PUBLIC_WEATHER_API_KEY` | フォールバック時   | OpenWeatherMap API キー                                                |
@@ -86,6 +86,20 @@ npm run dev
 | `npm run build`   | 本番ビルド                 |
 | `npm run start`   | 本番サーバー起動           |
 | `npm run lint`    | ESLint 実行                |
+| `npm run lint:full` | 既存違反も含めた ESLint 実行 |
+| `npm run typecheck` | TypeScript 型チェック |
+| `npm run check` | 開発ハーネス・設定・リンク・回帰テスト |
+
+`npm run lint` は導入時の既存違反を `eslint-suppressions.json` で追跡し、追加エラーを拒否します。既存違反が解消済みという意味ではありません。
+
+## プロジェクト管理
+
+[開発マップ](https://github.com/users/shinma06/projects/3)から進行中・着手候補・保留・完了・QA を確認できます。
+Issue は具体的な作業、Milestone は到達目標、native Relationship は実際の分解・依存を管理します。
+
+開発時は [AGENTS.md](AGENTS.md) → [プロジェクト情報](docs/project.md) → [作業手順](docs/workflow.md) を参照し、初回に `python3 scripts/bootstrap.py` で Git hooks を設定してください。
+Codex・Claude Code・Cursor で同じ手順を使い、Issue 専用 branch/worktree、CI、独立レビューと必要な受入を経て `main` に統合します。
+[導入元と確認範囲](docs/harness-adoption.md)、[GitHub の管理規約](docs/work-management.md)、[検証と PR gate](docs/verification/README.md)も参照してください。
 
 ---
 

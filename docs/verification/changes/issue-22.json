@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "issue": 22,
+  "gui_required": false,
+  "reason": "開発指示・GitHub管理・CIを導入する。製品ソース・UI・認証・API動作は変更しない。",
+  "cli_checks": ["npm run check", "npm run lint", "npm run typecheck", "npm run build"],
+  "cases": []
+}

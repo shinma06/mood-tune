@@ -1,0 +1,51 @@
+name: 開発・調査・動作確認
+description: 単一の目的、受入、担当と実際の関係を記録する
+title: "[運用] "
+labels: ["type:maintenance", "priority:P2", "status:ready"]
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: 目的・現象
+      description: 題名とtypeラベルを合わせる。機能/修正/調査/試験/運用/追跡。試験は元Issue番号も記載。
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 範囲・依存
+      description: 変更範囲、対象外、実際に必要な先行作業。
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 受入条件
+      description: チェックリストで成果と検証を記載。GUIは前提・操作・期待・対象build・証拠を具体化する。
+    validations:
+      required: true
+  - type: textarea
+    id: management
+    attributes:
+      label: Project・Milestone・Relationship
+      value: |
+        Project: MoodTune 開発マップ
+        Milestone: 到達条件が合う目標（未決なら理由・担当・次の条件）
+        Parent / Sub-issue: none
+        blocked by / blocking: none
+        Relationship Status: 未判定（確認後 Standalone / Has Relationship）
+        next: metadataを設定してreadback
+    validations:
+      required: true
+  - type: textarea
+    id: owner
+    attributes:
+      label: 担当と次の操作
+      value: |
+        status: ready
+        owner: unassigned
+        branch / base SHA: unassigned
+        target: main
+        reviewer: separate session pending
+        gui: required / not-required (reason)
+        next: claim後に着手

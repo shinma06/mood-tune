@@ -1,6 +1,11 @@
 # Active Context
 
-## 現在のセッションの焦点
+## 現在の作業管理
+
+進行中の作業・担当・次の操作は [GitHub Issue](https://github.com/shinma06/mood-tune/issues) と [開発マップ](https://github.com/users/shinma06/projects/3) を正本とする。[AGENTS.md](../../AGENTS.md) と [project.md](../../docs/project.md) から共通の作業手順・検証へ進む。
+以下はハーネス導入前の製品知識・リファクタリング記録であり、新しい作業の受入を満たした証拠として流用しない。
+
+## これまでの製品整備
 
 プロジェクト全体のリファクタリングを完了。構造と実装の両面から整理し、今後の開発をスムーズにする。
 

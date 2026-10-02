@@ -1,5 +1,7 @@
 # Progress
 
+このファイルはハーネス導入前の製品実装の記録。現在の作業・受入・課題は [GitHub Issue](https://github.com/shinma06/mood-tune/issues) と [開発マップ](https://github.com/users/shinma06/projects/3) を参照する。
+
 ## 実装済み機能（現在の実装）
 
 ### コア機能
