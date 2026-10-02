@@ -18,6 +18,8 @@ permissions:
 concurrency:
   # Issue and PR events may refer to the same checks; publish them serially.
   group: governance
+  # ponytail: native queue holds 100 runs; dispatch all PRs if that ceiling is reached.
+  queue: max
   cancel-in-progress: false
 jobs:
   governance:

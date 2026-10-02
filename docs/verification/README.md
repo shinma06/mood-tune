@@ -65,6 +65,7 @@ GUI 必須なら `cases` の各要素に `id`, `status: pass`, `head`, `observer
 
 [policy workflow](../../.github/workflows/policy.yml) は常に main のコードで PR/Issue/コメントをデータとして読む。PR コードを checkout/実行せず、read権限と commit status の write だけを使用する。PR・レビュー記録・Issue条件・main の変更で再判定する。
 取得・解析の前に古い gate 成功を pending に戻す。通信・所有・入力の不整合があれば成功へ進めず、担当が再実行する。更新後は実際の checks を読み戻す。
+Issue/PR の再判定は直列化し、標準の `queue: max` で待機する。[GitHub の上限](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)は100件。上限によるキャンセルが発生した場合は統合を止め、担当が Actions の PR governance を手動実行（workflow_dispatch）して全 open PR を再評価する。
 
 初回 #22 の base `c15251f127e60c571dba858a8a1d721308557e48` にはこの workflow がないため、CI の harness/test と別セッションレビューを先に完了する。その後、確認済みの導入コードを担当者が `python3 scripts/pr_policy.py --pr N --publish` で実行し、実結果の3 statusを発行する。成功した実在 check を ruleset に登録して通常 PR で統合する。成功の固定出力や一時的な保護解除は行わない。
 導入後の `--publish` は trusted main を使う管理担当の復旧用。通常は GitHub Actions が発行する。これは自動 reviewer・fixer・merge engine ではない。
