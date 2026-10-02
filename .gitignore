@@ -43,3 +43,12 @@ next-env.d.ts
 # local / personal (do not commit)
 CLAUDE.local.md
 vibe_cording.md
+
+# agent harness private state and Python cache
+__pycache__/
+*.pyc
+.harness-local/
+.claude/settings.local.json
+.codex/config.toml
+.mcp.json
+.cursor/mcp.json

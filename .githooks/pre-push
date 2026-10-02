@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+mode="$(python3 scripts/git_guard.py push)"
+if [ "$mode" = skip ]; then exit 0; fi
+while IFS= read -r git_variable; do
+  unset "$git_variable"
+done < <(git rev-parse --local-env-vars)
+python3 scripts/check.py

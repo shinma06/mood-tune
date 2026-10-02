@@ -1,0 +1,40 @@
+name: PR governance
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+  issue_comment:
+    types: [created, edited, deleted]
+  issues:
+    types: [edited, labeled, unlabeled, closed, reopened]
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+  statuses: write
+concurrency:
+  # Issue and PR events may refer to the same checks; publish them serially.
+  group: governance
+  # ponytail: native queue holds 100 runs; dispatch all PRs if that ceiling is reached.
+  queue: max
+  cancel-in-progress: false
+jobs:
+  governance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Never checkout a PR or execute its code with this token.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Reconcile live policy, independent review and acceptance
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/pr_policy.py --publish

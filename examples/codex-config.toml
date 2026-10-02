@@ -1,0 +1,13 @@
+# Merge only needed sections into your own configuration. Do not copy credentials.
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+# Optional; Node/npm required. Select and verify a package version when pinning.
+[mcp_servers.context7]
+command = "npx"
+args = ["-y", "@upstash/context7-mcp"]
+
+# Optional; this is an ENVIRONMENT VARIABLE NAME, not a token or Bearer value.
+[mcp_servers.github]
+url = "https://api.githubcopilot.com/mcp/"
+bearer_token_env_var = "GITHUB_MCP_TOKEN"

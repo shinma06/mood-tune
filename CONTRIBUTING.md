@@ -8,9 +8,10 @@ MoodTune への貢献ありがとうございます。このドキュメント�
 
 1. リポジトリをクローンし、依存関係をインストールする
    ```bash
-   git clone https://github.com/shinma06/MoodTune.git
-   cd MoodTune
-   npm install
+   git clone https://github.com/shinma06/mood-tune.git
+   cd mood-tune
+   npm ci
+   python3 scripts/bootstrap.py
    ```
 2. [README.md](./README.md) の「環境変数」に従い `.env.local` を用意する（非ログイン利用のみなら環境変数なしで起動可能です）
 3. `npm run dev` で開発サーバーを起動し、動作を確認する
@@ -19,11 +20,14 @@ MoodTune への貢献ありがとうございます。このドキュメント�
 
 ## 貢献の流れ
 
-1. 対象リポジトリで Issue を確認するか、新規 Issue で変更内容を提案する
-2. メインブランチから作業用ブランチを切る（例: `feature/xxx`, `fix/xxx`）
-3. 変更を加え、`npm run lint` でエラーがないことを確認する
-4. プルリクエストを作成し、変更内容・関連 Issue を記載する
-5. レビュー後、メンテナがマージする
+1. [作業管理](docs/work-management.md)に従って具体的な Issue を確認し、Project・Milestone・native 関係と担当 claim を記録する
+2. `origin/main` から `codex/<Issue>-<slug>`（または claude/cursor/agent）の専用 branch/worktree を作る。既存の他担当の `feature/*` は保全する
+3. [project.md](docs/project.md)の変更対象別チェックと、必要な GUI 受入を実行する
+4. 最初の意味ある push で Draft PR を作り、[PR テンプレート](.github/pull_request_template.md)と Issue ごとの受入 JSON を記入する
+5. 別セッションの固定 HEAD/base レビューを受け、[5つの必須 check](docs/verification/README.md)と受入を確認して通常 PR で squash merge する
+6. Issue・Project・Milestone・native 関係と、所有 branch/worktree の cleanup を読み戻す。main 統合と本番反映は区別する
+
+詳細と中断・再開は [start-work](.agents/skills/start-work/SKILL.md)、[finish-work](.agents/skills/finish-work/SKILL.md)、[開発フロー](docs/workflow.md)を参照してください。main への直接 push、force push、hooks/protection の迂回は行いません。
 
 ---
 
@@ -33,7 +37,7 @@ MoodTune への貢献ありがとうございます。このドキュメント�
 
 - **Framework**: Next.js 16 (App Router)
 - **Language**: TypeScript（明示的な型定義を推奨、`any` は避ける）
-- **Styling**: Tailwind CSS のみ。UI コンポーネントは shadcn/ui を優先する
+- **Styling**: Tailwind CSS を優先。既存の天気アニメーション等の CSS は維持し、UI コンポーネントは既存 shadcn/ui を使う
 - **Components**: 関数コンポーネント。デフォルトは Server Component、`useState` 等が必要な場合のみ `'use client'` を使用する
 
 ### ディレクトリ・ファイル
@@ -82,8 +86,9 @@ MoodTune への貢献ありがとうございます。このドキュメント�
 
 ## リント・ビルド
 
-- `npm run lint` で ESLint を実行する
-- `npm run build` で本番ビルドが通ることを PR 前に確認することを推奨します
+- ハーネス・文書・設定は `npm run check`、製品・依存関係は `npm run lint` / `npm run typecheck` / `npm run build` を実行する
+- lint は既存違反の標準 suppressions を使う。全件は `npm run lint:full` で確認し、新規エラーを隠す抑制追加は行わない。既存修正時は `npm run lint -- --prune-suppressions` で不要分を減らす
+- 本番ビルドは Google Fonts の取得にネットワークが必要。API キーなしのビルド成功は Spotify/天気の実接続を保証しない
 
 ---
 
