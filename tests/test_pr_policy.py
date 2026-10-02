@@ -1,4 +1,5 @@
 """Policy fixtures never contact GitHub or trust a PR as executable code."""
+import base64
 import copy
 import json
 from pathlib import Path
@@ -45,6 +46,8 @@ class PolicyTest(unittest.TestCase):
                 policy.validate_review(record, self.pr, self.issue, self.base)
         with self.assertRaises(ValueError):
             policy.validate_review(self.record, self.pr, dict(self.issue, body='New acceptance'), self.base)
+        with self.assertRaises(ValueError):
+            policy.validate_review(self.record, self.pr, dict(self.issue, state='closed'), self.base)
 
     def test_latest_authorized_review_wins_and_bad_record_does_not_fall_back(self):
         body = policy.MARKER + '\n```json\n' + json.dumps(self.record) + '\n```'
@@ -69,6 +72,11 @@ class PolicyTest(unittest.TestCase):
                       [dict(observation, head='c' * 40)], [dict(observation, evidence='')]]:
             with self.subTest(cases=cases), self.assertRaises(ValueError):
                 policy.validate_observations({'cases': cases}, ids, 'a' * 40)
+        second = dict(observation, id='UI-2')
+        policy.validate_observations({'cases': [observation, second]}, {'UI-1', 'UI-2'}, 'a' * 40)
+        with self.assertRaises(ValueError):
+            policy.validate_observations({'cases': [observation, dict(second, build='different build')]},
+                                         {'UI-1', 'UI-2'}, 'a' * 40)
 
     def test_changed_invalid_metadata_invalidates_previous_success_before_failure(self):
         pr = dict(self.pr, state='open', body='Invalid edited PR body', html_url='https://example.test/pr/1')
@@ -85,6 +93,53 @@ class PolicyTest(unittest.TestCase):
         published = [payload for _, payload in calls if payload]
         self.assertEqual({p['context'] for p in published}, {'PR policy', 'Agent review', 'Acceptance gate'})
         self.assertTrue(all(p['state'] == 'pending' for p in published))
+
+    def test_base_fetch_failure_invalidates_previous_success(self):
+        pr = dict(self.pr, state='open', html_url='https://example.test/pr/1')
+        published = []
+        def api(path, payload=None):
+            if payload is not None:
+                published.append(payload)
+                return {}
+            if path == 'pulls/1':
+                return pr
+            raise OSError('GitHub temporarily unavailable')
+        with patch.object(policy, 'api', side_effect=api), self.assertRaises(OSError):
+            policy.run(1, publish=True)
+        self.assertEqual({p['context'] for p in published}, {'PR policy', 'Agent review', 'Acceptance gate'})
+        self.assertTrue(all(p['state'] == 'pending' for p in published))
+
+    def test_issue_closure_during_check_cannot_publish_success(self):
+        pr = dict(self.pr, state='open', html_url='https://example.test/pr/1')
+        for closed in (False, True):
+            published, reads = [], []
+            def api(path, payload=None):
+                if payload is not None:
+                    published.append(payload)
+                    return {}
+                if path == 'pulls/1':
+                    return pr
+                if path == 'git/ref/heads/main':
+                    return {'object': {'sha': self.base}}
+                if path == 'issues/22':
+                    reads.append(path)
+                    return dict(self.issue, state='closed') if closed and len(reads) > 1 else self.issue
+                if path.startswith('contents/'):
+                    return {'content': base64.b64encode(json.dumps(self.acceptance).encode()).decode()}
+                if path.startswith('issues/1/comments?'):
+                    return [{'id': 1, 'author_association': 'OWNER',
+                             'body': policy.MARKER + '\n```json\n' + json.dumps(self.record) + '\n```'}]
+                if path.startswith('pulls/1/files?'):
+                    return [{'filename': 'docs/project.md'}]
+                raise AssertionError(path)
+            with self.subTest(closed=closed), patch.object(policy, 'api', side_effect=api):
+                if closed:
+                    with self.assertRaises(ValueError):
+                        policy.run(1, publish=True)
+                    self.assertEqual([p['state'] for p in published], ['pending'] * 3)
+                else:
+                    self.assertTrue(policy.run(1, publish=True))
+                    self.assertEqual([p['state'] for p in published], ['pending'] * 3 + ['success'] * 3)
 
 
 if __name__ == '__main__':

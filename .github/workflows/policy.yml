@@ -16,7 +16,8 @@ permissions:
   pull-requests: read
   statuses: write
 concurrency:
-  group: governance-${{ github.event.pull_request.number || github.event.issue.number || github.ref }}
+  # Issue and PR events may refer to the same checks; publish them serially.
+  group: governance
   cancel-in-progress: false
 jobs:
   governance:

@@ -59,7 +59,7 @@ JSON 内のコマンドはデータとして検査し、自動実行しない。
 ````
 
 GUI 必須なら `cases` の各要素に `id`, `status: pass`, `head`, `observer`, `build`, `evidence` を記録する。全 Case を現在 HEAD と識別した同じ候補 build で観察する。Case不足、旧SHA、pending/fail/blockedは拒否する。
-最新の権限あるレビュー記録だけを採用する。HEAD/base/PR本文/Issue題名・本文・ラベルの変更で旧記録は失効する。同じ GitHub アカウントでも独立セッションである必要があり、文字列の違いだけで実際の独立性を保証できるわけではない。coordinator は実セッションの報告を確認してから記録する。
+最新の権限あるレビュー記録だけを採用する。HEAD/base/PR本文/Issue題名・本文・状態・ラベルの変更で旧記録は失効する。同じ GitHub アカウントでも独立セッションである必要があり、文字列の違いだけで実際の独立性を保証できるわけではない。coordinator は実セッションの報告を確認してから記録する。
 
 ## trusted main と初回導入
 

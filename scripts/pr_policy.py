@@ -92,7 +92,7 @@ def validate_policy(pr, issue):
 
 def input_digest(pr, issue, base):
     data = {'head': pr['head']['sha'], 'base': base, 'target': pr['base']['ref'],
-            'body': pr['body'], 'title': issue['title'], 'acceptance': issue['body'],
+            'body': pr['body'], 'title': issue['title'], 'state': issue['state'], 'acceptance': issue['body'],
             'labels': sorted(label['name'] for label in issue['labels'])}
     return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
 
@@ -164,6 +164,8 @@ def validate_observations(record, ids, head):
         for key in ('observer', 'build', 'evidence'):
             if not isinstance(result.get(key), str) or not result[key].strip():
                 raise ValueError('GUI observation needs ' + key)
+    if len({result['build'] for result in results}) > 1:
+        raise ValueError('All GUI cases must use the same candidate build')
 
 
 def run(number, publish=False):
@@ -171,13 +173,13 @@ def run(number, publish=False):
     if pr['state'] != 'open':
         print(f'PR #{number} is closed; no new acceptance claimed.')
         return True
-    base = api('git/ref/heads/main')['object']['sha']
     head = pr['head']['sha']
     if publish:
         # Invalidate old success before parsing changed metadata or fetching evidence.
         for context in ('PR policy', 'Agent review', 'Acceptance gate'):
             api(f'statuses/{head}', {'state': 'pending', 'context': context,
                 'description': 'Checking current inputs and evidence', 'target_url': pr['html_url']})
+    base = api('git/ref/heads/main')['object']['sha']
     results = {}
     issue_number = field(pr.get('body'), 'Issue')
     if not re.fullmatch(r'#[1-9][0-9]*', issue_number):
