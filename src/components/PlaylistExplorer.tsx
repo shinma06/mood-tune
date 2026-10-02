@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useRef, useCallback } from "react"
 import WeatherMonitor from "./WeatherMonitor"
 import WeatherAnimation from "./WeatherAnimation"
 import WeatherMoodTuningPanel from "./WeatherMoodTuningPanel"
@@ -50,15 +50,12 @@ export default function PlaylistExplorer({
     const [selectedGenres, , isGenresInitialized] = useSelectedGenres()
     const [isSaving, setIsSaving] = useState(false)
     const [saveError, setSaveError] = useState<string | null>(null)
-    /** Spotify のレート制限(429)で一部取得できなかったときに true。ユーザーに「リクエスト過多」を伝える */
-    const [rateLimitMessage, setRateLimitMessage] = useState(false)
     const { autoRotationEnabled, tonearmVisible, noteEffectEnabled } = useSettings()
 
     const genresOnOpenRef = useRef<string[]>([])
 
     const {
         playlists,
-        currentIndex,
         setCurrentIndex,
         isLoading,
         loadingMode,
@@ -165,9 +162,9 @@ export default function PlaylistExplorer({
         }
     }, [openPanel, selectedGenres, playlists, updatePlaylistsWithDiff])
 
-    useEffect(() => {
-        if (isLoading) setOpenPanel(null)
-    }, [isLoading])
+    if (isLoading && openPanel !== null) {
+        setOpenPanel(null)
+    }
 
     const backgroundStyle = isTimeInitialized
       ? formatGradientBackground(getWeatherBackground(effectiveWeather, effectiveTimeOfDay))
@@ -364,11 +361,10 @@ export default function PlaylistExplorer({
                         </div>
                     </div>
 
-                    {noteEffectEnabled && (
+                    {noteEffectEnabled && openPanel === null && !isLoading && (
                         <FloatingNoteEffect
                             accentColor={vinylColors.accentColor}
                             isDarkText={isCanvasBackgroundDark}
-                            isPaused={openPanel !== null || isLoading}
                         />
                     )}
 
@@ -473,9 +469,7 @@ export default function PlaylistExplorer({
                             : isLoadingOrEmpty
                               ? "プレイリストを読み込み中です"
                               : currentPlaylist.trackUris.length === 0
-                                ? rateLimitMessage
-                                  ? "リクエストが多すぎます。しばらく時間をおいてから再度お試しください。"
-                                  : "再生できる曲を取得できませんでした。しばらく経ってからお試しください。"
+                                ? "再生できる曲を取得できませんでした。しばらく経ってからお試しください。"
                                 : null
                     const buttonLabel = needsSpotifyLogin
                         ? "Spotifyでログインして再生"

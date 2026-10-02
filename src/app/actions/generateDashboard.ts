@@ -152,7 +152,7 @@ export async function generateDashboard(
     for (let index = 0; index < playlistInfos.length; index++) {
       const info = playlistInfos[index]
       let imageUrl = getMockImageUrl(info?.genre ?? "")
-      let trackUris: string[] = []
+      const trackUris: string[] = []
 
       if (isLoggedIn && token && Array.isArray(info.tracks) && info.tracks.length > 0) {
         const results = await mapWithConcurrency(

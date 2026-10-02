@@ -57,12 +57,6 @@ export function useVinylRotation({
   const idleRotationRef = useRef(0)
   /** 前回の rAF 時刻（ms）。アイドル回転の delta 計算用 */
   const lastIdleTimeRef = useRef<number | null>(null)
-  /** rAF 内で参照するため（最新の isDragging） */
-  const isDraggingRef = useRef(false)
-  /** rAF 内で参照するため（snapBack 中か） */
-  const snapBackActiveRef = useRef(false)
-  isDraggingRef.current = isDragging
-  snapBackActiveRef.current = snapBackDurationMs !== null
 
   /** 2つの角度の最短差を -180〜180 の範囲で返す */
   const getAngleDifference = useCallback((angle1: number, angle2: number): number => {
@@ -131,15 +125,13 @@ export function useVinylRotation({
 
   /** アイドル時は 33⅓ RPM で常に回転。ドラッグ・スナップバック中は停止 */
   useEffect(() => {
+    if (!idleEnabled || isDragging || snapBackDurationMs !== null) {
+      lastIdleTimeRef.current = null
+      return
+    }
     let rafId: number
     const loop = (now: number) => {
       rafId = requestAnimationFrame(loop)
-      if (!idleEnabled) {
-        // 再開時に角度が急に進まないよう、delta 計算の基準時刻をリセットする
-        lastIdleTimeRef.current = null
-        return
-      }
-      if (isDraggingRef.current || snapBackActiveRef.current) return
       if (lastIdleTimeRef.current === null) lastIdleTimeRef.current = now
       const dt = now - lastIdleTimeRef.current
       lastIdleTimeRef.current = now
@@ -148,7 +140,7 @@ export function useVinylRotation({
     }
     rafId = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(rafId)
-  }, [idleEnabled])
+  }, [idleEnabled, isDragging, snapBackDurationMs])
 
   /** 戻り演出の transitionend で状態をクリア */
   useEffect(() => {
@@ -210,6 +202,7 @@ export function useVinylRotation({
     }
   }, [
     isDragging,
+    rotation,
     startRotation,
     totalRotation,
     rotationThreshold,
@@ -263,13 +256,6 @@ export function useVinylRotation({
     [handleStart]
   )
 
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      handleMove(e.clientX, e.clientY)
-    },
-    [handleMove]
-  )
-
   const handleTouchStart = useCallback(
     (e: React.TouchEvent) => {
       handleStart(e.touches[0].clientX, e.touches[0].clientY)
@@ -316,4 +302,3 @@ export function useVinylRotation({
     handleTouchEnd,
   }
 }
-

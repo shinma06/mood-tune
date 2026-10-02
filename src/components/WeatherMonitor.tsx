@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { createElement, useState, useEffect, useCallback, useRef } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { useWeather } from "@/contexts/WeatherContext"
@@ -12,12 +12,11 @@ import { useGeolocation } from "@/hooks/useGeolocation"
 import { useSettings } from "@/hooks/useSettings"
 
 export default function WeatherMonitor() {
-    const [currentTime, setCurrentTime] = useState<Date | null>(null)
     const [weatherState, setWeatherState] = useState<WeatherState>({
         status: "loading",
         message: "位置情報を取得中...",
     })
-    const { effectiveTimeOfDay, isCanvasBackgroundDark, setWeatherType, setActualWeatherType, weatherType, isMoodTuning, isMoodTuningApplied } = useWeather()
+    const { currentTime, effectiveTimeOfDay, isCanvasBackgroundDark, setWeatherType, setActualWeatherType, weatherType, isMoodTuning, isMoodTuningApplied } = useWeather()
     const { moodTuningWeatherDisplay } = useSettings()
 
     const isMoodTuningRef = useRef(isMoodTuning)
@@ -30,14 +29,6 @@ export default function WeatherMonitor() {
 
     /** 初回のみ位置情報を要求するためのフラグ（再レンダーで getCurrentPosition が繰り返し呼ばれるのを防ぐ） */
     const initialRequestDoneRef = useRef(false)
-
-    useEffect(() => {
-        setCurrentTime(new Date())
-        const timer = setInterval(() => {
-            setCurrentTime(new Date())
-        }, 1000)
-        return () => clearInterval(timer)
-    }, [])
 
     const handleWeatherFetch = useCallback(async (lat: number, lon: number, options?: { background?: boolean }) => {
         const isBackground = options?.background === true
@@ -98,7 +89,7 @@ export default function WeatherMonitor() {
     }, [requestGeolocation])
 
 
-    const dateTime = currentTime ? formatDateTime(currentTime) : { dateString: "--/--/--/---", timeString: "--:--" }
+    const dateTime = currentTime !== null ? formatDateTime(new Date(currentTime)) : { dateString: "--/--/--/---", timeString: "--:--" }
     const { dateString, timeString } = dateTime
 
     const tuningWeatherType =
@@ -121,14 +112,17 @@ export default function WeatherMonitor() {
         ? weatherState.data.description
         : ""
     
-    const WeatherIcon = displayWeatherType
-        ? getWeatherIcon(displayWeatherType, effectiveTimeOfDay)
-        : null
-    
     // isCanvasBackgroundDark: キャンバス背景の明暗に連動（画面上のテキスト・アイコン視認性用）
     const iconColor = displayWeatherType
         ? getWeatherThemeColor(displayWeatherType, effectiveTimeOfDay, isCanvasBackgroundDark)
         : undefined
+    const weatherIcon = displayWeatherType
+        ? createElement(getWeatherIcon(displayWeatherType, effectiveTimeOfDay), {
+            className: shouldUseMoodRainbowWeatherUi ? "relative z-10 h-10 w-10" : "w-10 h-10",
+            style: { color: iconColor },
+            strokeWidth: 1.5,
+        })
+        : null
     
     const textColorClass = isCanvasBackgroundDark ? "text-white" : ""
     const mutedTextColorClass = isCanvasBackgroundDark ? "text-white/80" : "text-muted-foreground/60"
@@ -170,7 +164,7 @@ export default function WeatherMonitor() {
                         </div>
                     )}
 
-                    {weatherState.status === "success" && WeatherIcon && (
+                    {weatherState.status === "success" && weatherIcon && (
                         <>
                             <div className="text-right">
                                 <p className={`text-2xl font-serif ${textColorClass || "text-foreground"}`}>{weatherState.data.temp}</p>
@@ -184,14 +178,10 @@ export default function WeatherMonitor() {
                             {shouldUseMoodRainbowWeatherUi ? (
                                 <span className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center">
                                     <span className="ring-rainbow absolute inset-0 rounded-full" aria-hidden />
-                                    <WeatherIcon className="relative z-10 h-10 w-10" style={{ color: iconColor }} strokeWidth={1.5} />
+                                    {weatherIcon}
                                 </span>
                             ) : (
-                                <WeatherIcon
-                                    className="w-10 h-10"
-                                    style={{ color: iconColor }}
-                                    strokeWidth={1.5}
-                                />
+                                weatherIcon
                             )}
                         </>
                     )}

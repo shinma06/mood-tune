@@ -3,7 +3,7 @@
 | 必須 check | 役割 |
 | --- | --- |
 | `harness-checks` | 設定・リンク・秘密候補と Python 回帰テスト |
-| `test` | `npm ci` → lint（既存抑制あり）→ 型チェック → 本番ビルド |
+| `test` | `npm ci` → lint → 型チェック → client-state 回帰チェック → 本番ビルド |
 | `PR policy` | Issue の実在・open・題名・各1ラベル、branch、PR 必須項目 |
 | `Agent review` | 現在の HEAD/base/Issue/PR 条件に一致する別セッションのレビュー記録 |
 | `Acceptance gate` | 受入 JSON と GUI 要否、必要な全 Case の現在 HEAD での結果 |

@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, useMemo, useCallback, ReactNode } from "react"
+import { createContext, useContext, useState, useSyncExternalStore, useMemo, useCallback, ReactNode } from "react"
 import { getTimeOfDay, isCanvasTextDark, type TimeOfDay, type WeatherType } from "@/lib/weather-background"
 import { normalizeWeatherType } from "@/lib/weather-utils"
 import { useLocalStorage } from "@/hooks/useLocalStorage"
@@ -12,8 +12,10 @@ import {
 import { isThemePreference } from "@/lib/validators"
 
 interface WeatherContextType {
-  /** クライアントで現在時刻が確定したか（SSR/初回は false。useEffect で true になり時間帯背景が有効になる） */
+  /** クライアントで現在時刻が確定したか（SSR/初回は false） */
   isTimeInitialized: boolean
+  /** 表示用の現地時刻（分単位のepoch ms）。SSR/初回は null。 */
+  currentTime: number | null
   /** 表示用の現在時（0–23）。マウント時と1分ごとに更新。 */
   displayHour: number
   /** 実際の時間帯（displayHour から算出）。UI の明暗・背景はこれにのみ従う。 */
@@ -49,10 +51,25 @@ interface WeatherContextType {
 
 const WeatherContext = createContext<WeatherContextType | undefined>(undefined)
 
+function subscribeToClock(onChange: () => void) {
+  const timer = setInterval(onChange, 1000)
+  return () => clearInterval(timer)
+}
+
+function getCurrentMinute() {
+  return Math.floor(Date.now() / 60000) * 60000
+}
+
+function subscribeToSystemTheme(onChange: () => void) {
+  const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
+  mediaQuery.addEventListener("change", onChange)
+  return () => mediaQuery.removeEventListener("change", onChange)
+}
+
 export function WeatherProvider({ children }: { children: ReactNode }) {
-  /** SSR/初回は false。useEffect でクライアント現地時刻を設定したあと true にし、時間帯に応じた背景を有効にする */
-  const [isTimeInitialized, setIsTimeInitialized] = useState(false)
-  const [displayHour, setDisplayHour] = useState(0)
+  const currentTime = useSyncExternalStore(subscribeToClock, getCurrentMinute, () => null)
+  const isTimeInitialized = currentTime !== null
+  const displayHour = currentTime === null ? 0 : new Date(currentTime).getHours()
   const [weatherType, setWeatherType] = useState<string | null>(null)
   const [actualWeatherType, setActualWeatherType] = useState<string | null>(null)
   const [moodTuningTimeOfDay, setMoodTuningTimeOfDay] = useState<TimeOfDay | null>(null)
@@ -63,15 +80,11 @@ export function WeatherProvider({ children }: { children: ReactNode }) {
     DEFAULT_THEME_PREFERENCE,
     { validate: isThemePreference }
   )
-  const [isSystemDark, setIsSystemDark] = useState(false)
-
-  /** 表示用時刻の単一ソース。マウント時にクライアント現地時刻で設定し、1分ごとに更新。SSR のサーバー時刻に依存しない。 */
-  useEffect(() => {
-    setDisplayHour(new Date().getHours())
-    setIsTimeInitialized(true)
-    const timer = setInterval(() => setDisplayHour(new Date().getHours()), 60000)
-    return () => clearInterval(timer)
-  }, [])
+  const isSystemDark = useSyncExternalStore(
+    subscribeToSystemTheme,
+    () => window.matchMedia("(prefers-color-scheme: dark)").matches,
+    () => false
+  )
 
   /** 実際の時間帯（displayHour から算出）。UI の明暗・背景はこれにのみ従う。 */
   const actualTimeOfDay = useMemo<TimeOfDay>(() => {
@@ -92,15 +105,6 @@ export function WeatherProvider({ children }: { children: ReactNode }) {
   const effectiveWeather = useMemo<WeatherType>(() => {
     return normalizeWeatherType(weatherType ?? "Clear")
   }, [weatherType])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
-    const syncSystemTheme = () => setIsSystemDark(mediaQuery.matches)
-    syncSystemTheme()
-    mediaQuery.addEventListener("change", syncSystemTheme)
-    return () => mediaQuery.removeEventListener("change", syncSystemTheme)
-  }, [])
 
   /** キャンバス背景が暗いか。視認性専用の静的テーブル（天気×表示時間）で算出。 */
   const isCanvasBackgroundDark = useMemo(() => {
@@ -132,6 +136,7 @@ export function WeatherProvider({ children }: { children: ReactNode }) {
 
   const contextValue = useMemo<WeatherContextType>(() => ({
     isTimeInitialized,
+    currentTime,
     displayHour,
     actualTimeOfDay,
     effectiveTimeOfDay,
@@ -153,6 +158,7 @@ export function WeatherProvider({ children }: { children: ReactNode }) {
     requestPlaylistRefresh,
   }), [
     isTimeInitialized,
+    currentTime,
     displayHour,
     actualTimeOfDay,
     effectiveTimeOfDay,
