@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useEffectEvent, useState, useSyncExternalStore } from "react"
 import {
   AVAILABLE_GENRES,
   AUTH_CHOICE_STORAGE_KEY,
@@ -78,36 +78,42 @@ function isLoginModalSuppressedInSession(): boolean {
   }
 }
 
-export default function OnboardingOrchestrator({
+function subscribeToClient() {
+  return () => {}
+}
+
+export default function OnboardingOrchestrator(props: Props) {
+  const isClient = useSyncExternalStore(subscribeToClient, () => true, () => false)
+  return isClient ? <OnboardingFlow key={String(props.isUnauthenticated)} {...props} /> : null
+}
+
+function OnboardingFlow({
   isUnauthenticated,
   loginModalTrigger = 0,
   onInitialized,
   onGenreSelectDone,
 }: Props) {
-  const [modal, setModal] = useState<ModalType>(null)
-  const [initialized, setInitialized] = useState(false)
-  const onInitializedRef = useRef(onInitialized)
-  const hasInitializedRef = useRef(false)
-  onInitializedRef.current = onInitialized
-
-  useEffect(() => {
+  const [initialModal] = useState<ModalType>(() => {
     const shouldShowLoginFirst =
       isUnauthenticated &&
       !isLoginModalSuppressedInSession() &&
       readAuthChoice() !== "guest"
-    const initial = shouldShowLoginFirst ? "login" : determineInitialModal(false)
-    setModal(initial)
-    setInitialized(true)
-    hasInitializedRef.current = true
-    onInitializedRef.current?.(initial === "genre-select")
-  }, [isUnauthenticated])
+    return shouldShowLoginFirst ? "login" : determineInitialModal(false)
+  })
+  const [modal, setModal] = useState(initialModal)
+  const [seenLoginTrigger, setSeenLoginTrigger] = useState(0)
+  const notifyInitialized = useEffectEvent(() =>
+    onInitialized?.(initialModal === "login" || initialModal === "genre-select")
+  )
 
   useEffect(() => {
-    if (!hasInitializedRef.current) return
-    if (!isUnauthenticated) return
-    if (loginModalTrigger <= 0) return
-    setModal("login")
-  }, [isUnauthenticated, loginModalTrigger])
+    notifyInitialized()
+  }, [])
+
+  if (loginModalTrigger !== seenLoginTrigger) {
+    setSeenLoginTrigger(loginModalTrigger)
+    if (isUnauthenticated && loginModalTrigger > 0) setModal("login")
+  }
 
   const handleGenreSelectComplete = () => {
     const completed = localStorage.getItem(ONBOARDING_COMPLETED_KEY) === "true"
@@ -131,20 +137,20 @@ export default function OnboardingOrchestrator({
     const completed = localStorage.getItem(ONBOARDING_COMPLETED_KEY) === "true"
     if (completed) {
       setModal(null)
+      onInitialized?.(false)
       return
     }
 
     const genres = readGenresFromStorage()
     if (isDefaultGenres(genres)) {
       setModal("genre-select")
-      onInitializedRef.current?.(true)
+      onInitialized?.(true)
       return
     }
 
     setModal("tutorial")
+    onInitialized?.(false)
   }
-
-  if (!initialized) return null
 
   if (modal === "login") {
     return <LoginModal onContinueWithoutLogin={handleContinueWithoutLogin} />

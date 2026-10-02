@@ -137,7 +137,7 @@
 - ユーザーが「選択解除」や最後の 1 つを外して 0 件にした直後に、修復で即座にデフォルトに戻ると UX が悪い
 - 初回読み込み・他タブ変更時のみ修復すれば、意図しない 0 件永続化は防げる
 
-**影響**: `useLocalStorage` の `handleStorageChange` で `parsed === null && raw !== null` のとき `JSON.parse(raw)` を state に設定
+**影響**: `useLocalStorage` は `useSyncExternalStore` で保存値を購読する。同一ページの明示的な保存値だけ検証の例外として保持し、初回・他タブからの無効値は修復する（#23で実装更新）
 
 ---
 

@@ -27,12 +27,17 @@ npm run dev
 | 変更対象 | 実行する検証 |
 | --- | --- |
 | 指示・文書・Python・Git hooks・GitHub 設定 | `npm run check`（新規ファイルも検査） |
-| TypeScript・React・依存関係・アプリ設定 | `npm run lint`、`npm run typecheck`、`npm run build` |
+| TypeScript・React・依存関係・アプリ設定 | `npm run lint`、`npm run typecheck`、`npm run test:state`、`npm run build` |
 | UI・認証・外部 API | 上記と、Issue に記載した再現手順・期待結果・対象 SHA の実操作 |
 | 本番ビルド | `npm run build`。`next/font/google` が Google Fonts を取得するためネットワークが必要 |
 
-アプリの unit/E2E テストスイートはまだない。`test` CI は lint・型チェック・本番ビルドであり、製品の全機能テストや GUI 合格を意味しない。
-既存 lint エラーは ESLint 標準の `eslint-suppressions.json` で記録し、[Issue #23](https://github.com/shinma06/mood-tune/issues/23) で解消を追跡する。通常 lint は追加エラーを拒否し、`npm run lint:full` は空の抑制ファイルで既存分も含めて表示する。抑制の追加・全件再生成で失敗を隠さず、修正後は `npm run lint -- --prune-suppressions` で不要分を除く。
+`test:state` は既存の Node.js・TypeScript・React で、保存値の検証と同期、SSR、生成の待機・重複要求を確認する。ブラウザーの Effect・操作・描画や外部APIまで検証するものではなく、変更した経路は別途 GUI で確認する。
+既存 lint エラー38件は [Issue #23](https://github.com/shinma06/mood-tune/issues/23) の修正で除去し、`eslint-suppressions.json` は空。`npm run lint:full` は空の抑制ファイルで全件を検査する。抑制の追加・全件再生成で失敗を隠さない。
+
+残る `@next/next/no-img-element` 警告3件は、次の既存表示を維持するため保留する。ルールは無効化しない。
+
+- `PlaylistExplorer` の2件: 外部プレイリスト画像の直接表示と `onError` のプレースホルダー切替を維持する。画像プロキシ・配信元許可設定の変更はこの lint 修正には含めない。
+- `TutorialMediaPlaceholder` の1件: ローカル画像の既存の表示枠と、画像・動画を切り替える構成を維持する。画像最適化は読み込み性能を評価する変更で扱う。
 
 ## 安定した製品条件
 

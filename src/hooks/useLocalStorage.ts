@@ -1,126 +1,94 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useCallback, useMemo, useSyncExternalStore } from "react"
 
-// カスタムイベント名（同一ページ内でのlocalStorage変更を通知）
 const STORAGE_CHANGE_EVENT = "local-storage-change"
+// 同じページで明示的に保存した値だけ、一時的な全解除などを許可する。
+const pageValues = new Map<string, string | null>()
 
-/** 同一ページ内の他コンポーネントに変更を通知（レンダリング中の setState を避けるため queueMicrotask で発火） */
-export function dispatchStorageChange(key: string) {
-  if (typeof window !== "undefined") {
-    queueMicrotask(() => {
-      window.dispatchEvent(new CustomEvent(STORAGE_CHANGE_EVENT, { detail: { key } }))
-    })
+function readStorage(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key)
+  } catch {
+    return null
   }
 }
 
+/** 同一ページ内での保存を通知。React の state updater 内では呼ばない。 */
+export function dispatchStorageChange(key: string) {
+  if (typeof window === "undefined") return
+  pageValues.set(key, readStorage(key))
+  queueMicrotask(() => {
+    window.dispatchEvent(new CustomEvent(STORAGE_CHANGE_EVENT, { detail: { key } }))
+  })
+}
+
 export interface UseLocalStorageOptions<T> {
-  /** 値のバリデーション。false を返すと initialValue にフォールバック */
+  /** 初回読み込み・他タブ変更時に検証し、不正な永続値を initialValue に修復する。 */
   validate?: (value: unknown) => value is T
 }
 
-/**
- * localStorage を使った永続化フック（同一ページ内での変更も検知可能）
- * @param key ストレージのキー
- * @param initialValue 初期値
- * @param options バリデーション等のオプション
- * @returns [値, 値を更新する関数, 初期化完了フラグ]
- */
+/** localStorage の購読。SSR/初回は initialValue と未初期化状態を返す。 */
 export function useLocalStorage<T>(
   key: string,
   initialValue: T,
   options?: UseLocalStorageOptions<T>
 ): [T, (value: T | ((prev: T) => T)) => void, boolean] {
-  const [storedValue, setStoredValue] = useState<T>(initialValue)
-  const [isInitialized, setIsInitialized] = useState(false)
-  /** initialValue を参照用に保持（削除時のフォールバック用） */
-  const initialValueRef = useRef(initialValue)
-  initialValueRef.current = initialValue
-  const validateRef = useRef(options?.validate)
-  validateRef.current = options?.validate
-
-  /** localStorage から読み込み、バリデーションを通す */
-  const parseAndValidate = useCallback((raw: string | null): T | null => {
-    if (raw === null) return null
+  const validate = options?.validate
+  const getSnapshot = useCallback(() => readStorage(key), [key])
+  const parseValue = useCallback((raw: string | null | undefined): T => {
+    if (raw == null) return initialValue
     try {
-      const parsed = JSON.parse(raw)
-      if (validateRef.current) {
-        return validateRef.current(parsed) ? parsed : null
-      }
-      return parsed as T
+      const value: unknown = JSON.parse(raw)
+      if (validate && !validate(value) && pageValues.get(key) !== raw) return initialValue
+      return value as T
     } catch {
-      return null
+      return initialValue
     }
-  }, [])
+  }, [key, initialValue, validate])
 
-  useEffect(() => {
-    if (typeof window === "undefined") return
-
-    const raw = window.localStorage.getItem(key)
-    const parsed = parseAndValidate(raw)
-    if (parsed !== null) {
-      setStoredValue(parsed)
-    }
-    setIsInitialized(true)
-  }, [key, parseAndValidate])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-
-    const handleStorageChange = (e: Event) => {
-      const customEvent = e as CustomEvent<{ key: string }>
-      if (customEvent.detail.key === key) {
-        const raw = window.localStorage.getItem(key)
-        const parsed = parseAndValidate(raw)
-        if (parsed !== null) {
-          setStoredValue(parsed)
-        } else if (raw !== null) {
-          // 同一ページ内での書き込み: バリデーションに失敗する値（例: []）もそのまま反映（修復しない）
-          try {
-            setStoredValue(JSON.parse(raw) as T)
-          } catch {
-            setStoredValue(initialValueRef.current)
-          }
-        } else {
-          setStoredValue(initialValueRef.current)
-        }
-      }
-    }
-
-    const handleNativeStorageChange = (e: StorageEvent) => {
-      if (e.key === key) {
-        const parsed = parseAndValidate(e.newValue)
-        // 削除された or バリデーション失敗時は initialValue にフォールバック
-        setStoredValue(parsed ?? initialValueRef.current)
-      }
-    }
-
-    window.addEventListener(STORAGE_CHANGE_EVENT, handleStorageChange)
-    window.addEventListener("storage", handleNativeStorageChange)
-
-    return () => {
-      window.removeEventListener(STORAGE_CHANGE_EVENT, handleStorageChange)
-      window.removeEventListener("storage", handleNativeStorageChange)
-    }
-  }, [key, parseAndValidate])
-
-  const setValue = useCallback(
-    (value: T | ((prev: T) => T)) => {
+  const subscribe = useCallback((onChange: () => void) => {
+    const repair = () => {
+      const raw = getSnapshot()
+      if (raw === null || pageValues.get(key) === raw || parseValue(raw) !== initialValue) return
+      const fallback = JSON.stringify(initialValue)
+      if (raw === fallback) return
       try {
-        setStoredValue((prev) => {
-          const valueToStore = value instanceof Function ? value(prev) : value
-          if (typeof window !== "undefined") {
-            window.localStorage.setItem(key, JSON.stringify(valueToStore))
-            dispatchStorageChange(key)
-          }
-          return valueToStore
-        })
-      } catch (error) {
-        console.warn(`localStorage への保存に失敗しました (key: ${key}):`, error)
+        window.localStorage.setItem(key, fallback)
+        dispatchStorageChange(key)
+      } catch {
+        // 保存不可でも表示は検証済みの初期値へフォールバックする。
       }
-    },
-    [key]
-  )
+    }
+    const handleLocalChange = (event: Event) => {
+      if ((event as CustomEvent<{ key: string }>).detail?.key === key) onChange()
+    }
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== key) return
+      pageValues.delete(key)
+      repair()
+      onChange()
+    }
+    window.addEventListener(STORAGE_CHANGE_EVENT, handleLocalChange)
+    window.addEventListener("storage", handleStorageChange)
+    repair()
+    return () => {
+      window.removeEventListener(STORAGE_CHANGE_EVENT, handleLocalChange)
+      window.removeEventListener("storage", handleStorageChange)
+    }
+  }, [key, initialValue, getSnapshot, parseValue])
 
-  return [storedValue, setValue, isInitialized]
+  const raw = useSyncExternalStore(subscribe, getSnapshot, () => undefined)
+  const storedValue = useMemo(() => parseValue(raw), [raw, parseValue])
+  const setValue = useCallback((value: T | ((prev: T) => T)) => {
+    try {
+      const next = value instanceof Function ? value(parseValue(getSnapshot())) : value
+      window.localStorage.setItem(key, JSON.stringify(next))
+      dispatchStorageChange(key)
+    } catch (error) {
+      console.warn(`localStorage への保存に失敗しました (key: ${key}):`, error)
+    }
+  }, [key, getSnapshot, parseValue])
+
+  return [storedValue, setValue, raw !== undefined]
 }

@@ -16,7 +16,6 @@ interface FloatingNote {
 interface FloatingNoteEffectProps {
   accentColor: string
   isDarkText: boolean
-  isPaused?: boolean
 }
 
 const NOTE_SYMBOLS = ["♪", "♫", "♩", "♬"]
@@ -28,17 +27,11 @@ const randomBetween = (min: number, max: number): number => {
 export default function FloatingNoteEffect({
   accentColor,
   isDarkText,
-  isPaused = false,
 }: FloatingNoteEffectProps) {
   const [notes, setNotes] = useState<FloatingNote[]>([])
   const idRef = useRef(0)
 
   useEffect(() => {
-    if (isPaused) {
-      setNotes([])
-      return
-    }
-
     const spawnNote = () => {
       const id = idRef.current++
       const durationMs = Math.round(randomBetween(2400, 3600))
@@ -54,21 +47,22 @@ export default function FloatingNoteEffect({
       }
 
       setNotes((prev) => [...prev.slice(-9), note])
-      window.setTimeout(() => {
-        setNotes((prev) => prev.filter((n) => n.id !== id))
-      }, durationMs + 250)
     }
 
-    spawnNote()
+    const firstFrame = requestAnimationFrame(spawnNote)
     const timer = window.setInterval(spawnNote, randomBetween(520, 900))
-    return () => window.clearInterval(timer)
-  }, [isPaused])
+    return () => {
+      cancelAnimationFrame(firstFrame)
+      window.clearInterval(timer)
+    }
+  }, [])
 
   return (
     <div className="absolute inset-0 pointer-events-none overflow-visible" aria-hidden>
       {notes.map((note) => (
         <span
           key={note.id}
+          onAnimationEnd={() => setNotes((prev) => prev.filter((n) => n.id !== note.id))}
           className="absolute select-none will-change-transform motion-note-float"
           style={{
             left: `${note.xPercent}%`,
