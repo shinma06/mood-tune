@@ -36,6 +36,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm run test:state
       - run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: '1'

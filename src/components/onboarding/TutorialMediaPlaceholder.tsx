@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { ImageIcon } from "lucide-react"
 
 interface Props {
@@ -19,9 +19,12 @@ const PlaceholderBlock = () => (
 )
 
 export default function TutorialMediaPlaceholder({ mediaPath, alt, className = "" }: Props) {
+  return <TutorialMedia key={mediaPath} mediaPath={mediaPath} alt={alt} className={className} />
+}
+
+function TutorialMedia({ mediaPath, alt, className }: Props) {
   const [videoError, setVideoError] = useState(false)
   const containerClassName = `w-full h-full rounded-xl overflow-hidden bg-black/40 ${className}`.trim()
-  useEffect(() => setVideoError(false), [mediaPath])
 
   if (mediaPath) {
     const isVideo = /\.(mp4|webm)$/i.test(mediaPath)

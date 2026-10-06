@@ -23,6 +23,16 @@ interface UsePlaylistManagerOptions {
   isGenrePanelOpen: boolean
 }
 
+interface PlaylistRequest {
+  weather: WeatherType
+  time: TimeOfDay
+  genres: Genre[]
+  mode: Exclude<LoadingMode, null>
+  /** 差分更新時は、再利用する既存データと最終表示順を保持する。 */
+  previous?: DashboardItem[] | null
+  order?: string[]
+}
+
 export function usePlaylistManager({
   initialPlaylists,
   selectedGenres,
@@ -38,70 +48,47 @@ export function usePlaylistManager({
 }: UsePlaylistManagerOptions) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [playlists, setPlaylists] = useState<DashboardItem[] | null>(initialPlaylists ?? null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [loadingMode, setLoadingMode] = useState<LoadingMode>(null)
+  const [request, setRequest] = useState<PlaylistRequest | null>(null)
+  const [initialSyncStarted, setInitialSyncStarted] = useState(false)
+  const [observedEnvironment, setObservedEnvironment] = useState<{
+    weather: string | null
+    time: TimeOfDay
+  } | null>(null)
+  const [handledRefreshTrigger, setHandledRefreshTrigger] = useState(0)
+  // Effect の再接続でも、同じ生成要求を二重送信しない。
+  const pendingGeneration = useRef<{
+    request: PlaylistRequest
+    promise: Promise<DashboardItem[]>
+  } | null>(null)
 
-  const hasPerformedInitialSyncRef = useRef(false)
-  const prevTimeOfDayRef = useRef<TimeOfDay | null>(null)
-  const prevActualWeatherRef = useRef<string | null>(null)
-  const isLoadingRef = useRef(false)
-  isLoadingRef.current = isLoading
-
-  const displayPlaylists = useMemo(() => {
-    return playlists && playlists.length > 0 ? playlists : []
-  }, [playlists])
-
+  const isLoading = request !== null
+  const loadingMode = request?.mode ?? null
+  const displayPlaylists = useMemo(() => playlists ?? [], [playlists])
   const isLoadingOrEmpty = isLoading || displayPlaylists.length === 0
-
-  const safeCurrentIndex = useMemo(() => {
-    if (displayPlaylists.length === 0) return 0
-    return Math.min(currentIndex, displayPlaylists.length - 1)
-  }, [currentIndex, displayPlaylists.length])
-
+  const safeCurrentIndex = Math.min(currentIndex, Math.max(0, displayPlaylists.length - 1))
   const currentPlaylist = displayPlaylists[safeCurrentIndex] ?? EMPTY_PLAYLIST
 
-  const refreshPlaylists = useCallback(async (options?: { autoUpdate?: boolean }) => {
+  const refreshPlaylists = useCallback((options?: { autoUpdate?: boolean }) => {
     if (selectedGenres.length === 0) return
-    if (isLoadingRef.current) return
-    setLoadingMode(options?.autoUpdate ? "auto" : "all")
-    setIsLoading(true)
-    try {
-      const generated = await generateDashboard(effectiveWeather, effectiveTimeOfDay, selectedGenres as Genre[])
-      setPlaylists(generated)
-      setCurrentIndex((prev) => Math.min(prev, Math.max(0, generated.length - 1)))
-    } catch (error) {
-      console.error("Failed to refresh playlists:", error)
-    } finally {
-      setIsLoading(false)
-      setLoadingMode(null)
-    }
+    setRequest((current) => current ?? {
+      weather: effectiveWeather,
+      time: effectiveTimeOfDay,
+      genres: selectedGenres,
+      mode: options?.autoUpdate ? "auto" : "all",
+    })
   }, [effectiveWeather, effectiveTimeOfDay, selectedGenres])
 
-  const refreshPlaylistsRef = useRef(refreshPlaylists)
-  refreshPlaylistsRef.current = refreshPlaylists
-
-  const refreshPlaylistByGenre = useCallback(async (genre: Genre) => {
+  const refreshPlaylistByGenre = useCallback((genre: Genre) => {
     if (!selectedGenres.includes(genre)) return
-    if (isLoadingRef.current) return
-    setLoadingMode("single")
-    setIsLoading(true)
-    try {
-      const generated = await generateDashboard(effectiveWeather, effectiveTimeOfDay, [genre])
-      const newItem = generated[0]
-      if (!newItem) return
-      setPlaylists((prev) => {
-        if (!prev) return [newItem]
-        return prev.map((p) => (p.genre === genre ? newItem : p))
-      })
-    } catch (error) {
-      console.error("Failed to refresh playlist by genre:", error)
-    } finally {
-      setIsLoading(false)
-      setLoadingMode(null)
-    }
+    setRequest((current) => current ?? {
+      weather: effectiveWeather,
+      time: effectiveTimeOfDay,
+      genres: [genre],
+      mode: "single",
+    })
   }, [effectiveWeather, effectiveTimeOfDay, selectedGenres])
 
-  const updatePlaylistsWithDiff = useCallback(async (
+  const updatePlaylistsWithDiff = useCallback((
     currentGenres: string[],
     diff: { added: string[]; removed: string[]; unchanged: string[] },
     currentPlaylists: DashboardItem[] | null,
@@ -112,82 +99,81 @@ export function usePlaylistManager({
       setCurrentIndex(0)
       return
     }
-    if (isLoadingRef.current) return
-
-    setLoadingMode(isInitialSync ? "initial" : "added")
-    setIsLoading(true)
-    try {
-      const existingMap = new Map<string, DashboardItem>()
-      if (currentPlaylists) {
-        currentPlaylists.forEach(p => existingMap.set(p.genre, p))
-      }
-
-      const unchangedPlaylists = diff.unchanged
-        .map(genre => existingMap.get(genre))
-        .filter((p): p is DashboardItem => p !== undefined)
-
-      let newPlaylists: DashboardItem[] = []
-      if (diff.added.length > 0) {
-        newPlaylists = await generateDashboard(effectiveWeather, effectiveTimeOfDay, diff.added as Genre[])
-      }
-
-      const allMap = new Map<string, DashboardItem>()
-      unchangedPlaylists.forEach(p => allMap.set(p.genre, p))
-      newPlaylists.forEach(p => allMap.set(p.genre, p))
-
-      const finalPlaylists = currentGenres
-        .map(genre => allMap.get(genre))
-        .filter((p): p is DashboardItem => p !== undefined)
-
-      setPlaylists(finalPlaylists)
-      setCurrentIndex(0)
-    } catch (error) {
-      console.error("Failed to generate dashboard:", error)
-    } finally {
-      setIsLoading(false)
-      setLoadingMode(null)
-    }
+    setRequest((current) => current ?? {
+      weather: effectiveWeather,
+      time: effectiveTimeOfDay,
+      genres: diff.added as Genre[],
+      previous: currentPlaylists,
+      order: currentGenres,
+      mode: isInitialSync ? "initial" : "added",
+    })
   }, [effectiveWeather, effectiveTimeOfDay])
 
-  // Initial sync
-  useEffect(() => {
-    if (suspended || !isGenresInitialized || hasPerformedInitialSyncRef.current) return
-    hasPerformedInitialSyncRef.current = true
-
-    const currentPlaylistGenres = playlists?.map(p => p.genre) ?? []
-    if (hasGenresChanged(currentPlaylistGenres, selectedGenres)) {
-      const diff = getGenresDiff(currentPlaylistGenres, selectedGenres)
-      updatePlaylistsWithDiff(selectedGenres, diff, playlists, true)
+  // 初期同期・実環境の変更・明示的な再生成は、入力の変更時に一度だけ要求する。
+  // loading は要求から導出し、Effect 内で同期的に立ち上げない。
+  if (!request && !suspended && isGenresInitialized && !initialSyncStarted) {
+    setInitialSyncStarted(true)
+    const currentGenres = playlists?.map((item) => item.genre) ?? []
+    if (hasGenresChanged(currentGenres, selectedGenres)) {
+      updatePlaylistsWithDiff(selectedGenres, getGenresDiff(currentGenres, selectedGenres), playlists, true)
     }
-  }, [suspended, isGenresInitialized, selectedGenres, playlists, updatePlaylistsWithDiff])
+  }
 
-  // Auto-update on time-of-day change
-  useEffect(() => {
-    if (isMoodTuning || !isGenresInitialized || selectedGenres.length === 0) return
-    const prev = prevTimeOfDayRef.current
-    prevTimeOfDayRef.current = actualTimeOfDay
-    if (prev !== null && prev !== actualTimeOfDay) {
-      refreshPlaylists({ autoUpdate: true })
+  if (!request && !suspended && !isMoodTuning && isGenresInitialized && selectedGenres.length > 0) {
+    if (observedEnvironment?.time !== actualTimeOfDay || observedEnvironment?.weather !== actualWeatherType) {
+      setObservedEnvironment({ weather: actualWeatherType, time: actualTimeOfDay })
+      if (observedEnvironment && (
+        observedEnvironment.time !== actualTimeOfDay ||
+        (observedEnvironment.weather !== null && observedEnvironment.weather !== actualWeatherType)
+      )) {
+        refreshPlaylists({ autoUpdate: true })
+      }
     }
-  }, [actualTimeOfDay, isMoodTuning, isGenresInitialized, selectedGenres.length, refreshPlaylists])
+  }
 
-  // Mood Tuning refresh trigger
-  useEffect(() => {
-    if (isGenrePanelOpen) return
-    if (playlistRefreshTrigger === 0 || !isGenresInitialized || selectedGenres.length === 0) return
-    refreshPlaylistsRef.current()
-  }, [playlistRefreshTrigger, isGenresInitialized, selectedGenres.length, isGenrePanelOpen])
+  if (!request && !suspended && !isGenrePanelOpen && isGenresInitialized && selectedGenres.length > 0 &&
+      playlistRefreshTrigger !== handledRefreshTrigger) {
+    setHandledRefreshTrigger(playlistRefreshTrigger)
+    if (playlistRefreshTrigger > 0) refreshPlaylists()
+  }
 
-  // Auto-update on weather change
   useEffect(() => {
-    if (isMoodTuning || !isGenresInitialized || selectedGenres.length === 0) return
-    const current = actualWeatherType ?? null
-    const prev = prevActualWeatherRef.current
-    prevActualWeatherRef.current = current
-    if (prev !== null && prev !== current) {
-      refreshPlaylists({ autoUpdate: true })
+    if (!request) return
+    let active = true
+    if (pendingGeneration.current?.request !== request) {
+      pendingGeneration.current = {
+        request,
+        promise: request.genres.length > 0
+          ? generateDashboard(request.weather, request.time, request.genres)
+          : Promise.resolve([]),
+      }
     }
-  }, [actualWeatherType, isMoodTuning, isGenresInitialized, selectedGenres.length, refreshPlaylists])
+    pendingGeneration.current.promise.then((generated) => {
+      if (!active) return
+      if (request.mode === "single") {
+        const newItem = generated[0]
+        if (newItem) {
+          setPlaylists((previous) => previous
+            ? previous.map((item) => item.genre === newItem.genre ? newItem : item)
+            : [newItem])
+        }
+      } else if (request.order) {
+        const byGenre = new Map((request.previous ?? []).map((item) => [item.genre, item]))
+        generated.forEach((item) => byGenre.set(item.genre, item))
+        setPlaylists(request.order.map((genre) => byGenre.get(genre))
+          .filter((item): item is DashboardItem => item !== undefined))
+        setCurrentIndex(0)
+      } else {
+        setPlaylists(generated)
+        setCurrentIndex((previous) => Math.min(previous, Math.max(0, generated.length - 1)))
+      }
+    }).catch((error) => {
+      if (active) console.error("Failed to generate dashboard:", error)
+    }).finally(() => {
+      if (active) setRequest(null)
+    })
+    return () => { active = false }
+  }, [request])
 
   return {
     playlists,

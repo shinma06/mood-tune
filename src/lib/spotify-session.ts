@@ -113,7 +113,7 @@ export async function getSession(): Promise<SpotifySession | null> {
   const cookieStore = await cookies()
   const raw = cookieStore.get(SESSION_COOKIE_NAME)?.value
   if (!raw) return null
-  let session = decrypt(raw)
+  const session = decrypt(raw)
   if (!session) return null
   if (Date.now() < session.expiresAt - REFRESH_MARGIN_MS) return session
   const refreshed = await refreshSpotifyToken(session.refreshToken)

@@ -17,7 +17,7 @@
 | branch | 既存 main 運用を維持。参照先の develop/main 昇格、Android/Gradle/ZIP専用部分は移植しない |
 | 検証 | template の Python テストに PR/受入/固定レビューの試験を追加。新規・未追跡ファイルも検査 |
 | アプリ CI | 不足していた ESLint 依存を補い、lint・型チェック・本番ビルドを接続 |
-| 既存 lint 課題 | 初回観測は38 errors / 11 warnings。[Issue #23](https://github.com/shinma06/mood-tune/issues/23)と標準 suppressions で既存38件を記録し、新規違反を拒否。全件を解決済みとは扱わない |
+| 既存 lint 課題 | 初回観測は38 errors / 11 warningsを標準 suppressions で記録。後続の[Issue #23](https://github.com/shinma06/mood-tune/issues/23)で38 errorsと不要な抑制を除去。残る画像警告3件の理由は[project.md](project.md)に記載 |
 | gate | trusted main が PR policy / Agent review / Acceptance gate を検査。harness-checks/test と合わせ5 check |
 | 所有と秘密 | 別worktree、未解放claim保持、GUI予約・private registryを再利用。個人設定・認証・他projectの状態は移植しない |
 | 自動化 | GitHubイベントに対する gate 再評価を導入。元の専用自動fixer/merge engineや定期ジョブは起動しない |

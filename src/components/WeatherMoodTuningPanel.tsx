@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState } from "react"
 import { useWeather } from "@/contexts/WeatherContext"
 import { getWeatherIcon, getWeatherThemeColor, normalizeWeatherType } from "@/lib/weather-utils"
 import { getTimeOfDay } from "@/lib/weather-background"
@@ -41,10 +41,8 @@ export default function WeatherMoodTuningPanel({
     weatherType,
     setWeatherType,
     actualWeatherType,
-    setActualWeatherType,
     moodTuningTimeOfDay,
     setMoodTuningTimeOfDay,
-    isMoodTuning,
     setIsMoodTuning,
     requestPlaylistRefresh,
   } = useWeather()
@@ -52,7 +50,7 @@ export default function WeatherMoodTuningPanel({
   /** 親制御時は props を、そうでなければ内部 state を使う */
   const isOpen = onOpenProp !== undefined ? (controlledIsOpen ?? false) : internalOpen
   /** パネルを開いた時点のスナップショット（開閉時の変更判定・リセットボタン表示判定用） */
-  const snapshotRef = useRef<{
+  const [snapshot, setSnapshot] = useState<{
     openedWeather: string | null
     openedTimeOfDay: TimeOfDay | null
     actualWeatherAtOpen: string | null
@@ -61,12 +59,12 @@ export default function WeatherMoodTuningPanel({
 
   /** パネルを開く: この時点の天気・時間と「現在の天気・時間」をスナップショットしてから開く */
   const handleOpenPanel = () => {
-    snapshotRef.current = {
+    setSnapshot({
       openedWeather: weatherType,
       openedTimeOfDay: moodTuningTimeOfDay,
       actualWeatherAtOpen: actualWeatherType,
       actualTimeOfDayAtOpen: getTimeOfDay(displayHour),
-    }
+    })
     if (onOpenProp) onOpenProp()
     else setInternalOpen(true)
   }
@@ -84,7 +82,7 @@ export default function WeatherMoodTuningPanel({
 
   /** パネルを閉じる: 開いた時点の天気・時間と比べて変わっている場合のみプレイリストを再構築 */
   const handleClosePanel = () => {
-    const { openedWeather, openedTimeOfDay } = snapshotRef.current
+    const { openedWeather, openedTimeOfDay } = snapshot
     if (weatherType !== openedWeather || moodTuningTimeOfDay !== openedTimeOfDay) {
       requestPlaylistRefresh()
     }
@@ -125,7 +123,7 @@ export default function WeatherMoodTuningPanel({
     effectiveTimeOfDay !== actualTimeOfDay
 
   /** パネルを開いた時点で「現在の天気・時間」と違う状態を設定していた場合のみリセットボタンを表示 */
-  const { openedWeather, openedTimeOfDay, actualWeatherAtOpen, actualTimeOfDayAtOpen } = snapshotRef.current
+  const { openedWeather, openedTimeOfDay, actualWeatherAtOpen, actualTimeOfDayAtOpen } = snapshot
   const actualWeatherAtOpenNorm = normalizeWeatherType(actualWeatherAtOpen ?? "Clear")
   const actualTimeAtOpen = actualTimeOfDayAtOpen ?? actualTimeOfDay
   const effectiveWeatherAtOpen = openedWeather != null ? normalizeWeatherType(openedWeather) : actualWeatherAtOpenNorm

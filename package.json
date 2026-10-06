@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "lint:full": "eslint . --suppressions-location .github/empty-eslint-suppressions.json",
     "typecheck": "tsc --noEmit --incremental false",
+    "test:state": "node tests/client-state.mjs",
     "check": "python3 scripts/check.py"
   },
   "dependencies": {
